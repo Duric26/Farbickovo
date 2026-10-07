@@ -4,7 +4,7 @@
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#8fd8ff">
 <link rel="icon" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Farbičkovo">
+<meta name="apple-mobile-web-app-title" content="Farbičkovo">
 <style>
 :root{--cur:#ff3b3b;--b:62px;--ink:#3a2556;--font:"Baloo 2","Fredoka","Comic Sans MS","Chalkboard SE","Marker Felt","Segoe Print",system-ui,sans-serif}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
@@ -12,6 +12,8 @@ html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;font-fam
 body{background:linear-gradient(180deg,#8fd8ff 0%,#c9ecff 45%,#fff3c9 100%)}
 button{font:inherit;cursor:pointer;touch-action:manipulation;border:none;padding:0;color:inherit}
 .hidden{display:none!important}
+#clear.armed{background:#ff5c5c;box-shadow:0 5px 0 #c73c3c;animation:shake .4s}
+@keyframes shake{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
 
 /* ---------- decorative sky ---------- */
 .sky{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
@@ -1431,7 +1433,7 @@ document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>setSize(+b.dat
 document.getElementById('rotL').onclick=()=>spin(-1);document.getElementById('rotR').onclick=()=>spin(1);
 function spin(d){const off=camera.position.clone().sub(controls.target);off.applyAxisAngle(new THREE.Vector3(0,1,0),d*Math.PI/4);camera.position.copy(controls.target).add(off);controls.update();}
 document.getElementById('undo').onclick=()=>{const u=undo[S.model];if(u.length){restore(u.pop());save();}};
-document.getElementById('clear').onclick=()=>{if(!confirm('Začať odznova? (vymaže farby)'))return;pushUndo();
+let clrT=0;document.getElementById('clear').onclick=e=>{const b=e.currentTarget;if(Date.now()-clrT>3000){clrT=Date.now();b.classList.add('armed');setTimeout(()=>b.classList.remove('armed'),3000);return;}clrT=0;b.classList.remove('armed');pushUndo();
   meshes(cur).forEach(m=>{m.geometry.attributes.color.array.fill(1);m.geometry.attributes.color.needsUpdate=true;});save();};
 document.getElementById('png').onclick=()=>{renderer.render(scene,camera);const a=document.createElement('a');
   const names={bear:'macko',cube:'kocka',pyr:'pyramida',sphere:'lopta'};a.download='omalovanka-'+names[S.model]+'.png';a.href=cv.toDataURL('image/png');a.click();};
@@ -1440,7 +1442,7 @@ function resize(){const w=view.clientWidth,h=view.clientHeight;if(!w||!h)return;
 new ResizeObserver(resize).observe(view);
 pick(S.color);setTool('fill');setSize(0.22);openHome();
 (function loop(){requestAnimationFrame(loop);controls.update();renderer.render(scene,camera);})();
-window.__setTool=setTool;window.__paintAll=(name,cols)=>{const g=ensure(name);meshes(g).forEach((m,i)=>{if(cols[i]){const c=C(cols[i]);for(let t=0;t<m.geometry.attributes.color.count/3;t++)setTri(m.geometry.attributes.color.array,t,c);m.geometry.attributes.color.needsUpdate=true;}});return thumb(name);};window.__ready=true;
+if(window.top!==window)document.getElementById('png').hidden=true;window.__setTool=setTool;window.__paintAll=(name,cols)=>{const g=ensure(name);meshes(g).forEach((m,i)=>{if(cols[i]){const c=C(cols[i]);for(let t=0;t<m.geometry.attributes.color.count/3;t++)setTri(m.geometry.attributes.color.array,t,c);m.geometry.attributes.color.needsUpdate=true;}});return thumb(name);};window.__ready=true;
 })();
 </script>
 <script>if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});</script>
