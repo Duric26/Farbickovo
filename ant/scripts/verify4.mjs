@@ -13,7 +13,7 @@ await p.goto('file://'+join(root,'dist','BajaBaja.html')); await p.waitForTimeou
 // premenovanie – over text tlačidiel
 const whoLabels = await p.$$eval('.who-btn', els=>els.map(e=>e.textContent.trim()));
 console.log('Tlačidlá:', JSON.stringify(whoLabels));
-await p.click('button[data-who="Pája 1"]'); await p.waitForTimeout(150);
+await p.click('button[data-who="Pája"]'); await p.waitForTimeout(150);
 if(await p.locator('#moodModal:not(.hidden)').count()){ await p.click('.mood-btn'); await p.click('#moodSave'); }
 const hi = await p.textContent('#moodHi'); // už zavreté, ignoruj
 

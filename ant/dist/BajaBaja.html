@@ -76,7 +76,12 @@ body{
 .brand{display:flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.5px}
 .brand-ant{width:26px;height:26px;color:var(--accent)}
 .file-controls{display:flex;align-items:center;gap:10px;flex:1}
-.filename{color:var(--muted);font-size:13px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filename{color:var(--muted);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.search-box{display:flex;align-items:center;gap:4px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:2px 4px}
+.search-box input{background:transparent;border:none;outline:none;color:var(--ink);font-size:13px;width:150px;padding:4px}
+#searchCount{font-size:12px;min-width:34px;text-align:center}
+.textLayer span.search-hit{background:rgba(255,215,0,.45);border-radius:2px}
+.textLayer span.search-cur{background:rgba(255,140,0,.75);border-radius:2px}
 .top-right{display:flex;gap:8px}
 
 .workspace{flex:1;display:flex;min-height:0}
@@ -220,6 +225,14 @@ body{
     <div class="file-controls">
       <button class="btn" id="btnOpen">📂 Otvoriť PDF</button>
       <button class="btn" id="btnSave" disabled>💾 Uložiť PDF</button>
+      <button class="btn ghost" id="btnUndo" title="Späť (Ctrl+Z)" disabled>↶</button>
+      <button class="btn ghost" id="btnRedo" title="Znova (Ctrl+Y)" disabled>↷</button>
+      <span class="search-box">
+        <input id="searchInp" type="text" placeholder="Hľadať v dokumente…">
+        <button class="btn mini" id="searchPrev" title="Predošlé">↑</button>
+        <button class="btn mini" id="searchNext" title="Ďalšie">↓</button>
+        <span id="searchCount" class="muted"></span>
+      </span>
       <span class="filename" id="fileName">žiadny súbor</span>
     </div>
     <div class="top-right">
@@ -442,11 +455,20 @@ const state = {
   tool: 'select',
   annos: {},           // {pageIndex: [anno]}
   pageViews: [],       // {pageEl, canvas, annoLayer, viewport, vp1}
-  opt: { color: '#e23b3b', size: 16, fontFamily: 'sans', bold: false, italic: false, draw: 4, hlColor: '#ffe14d', coverColor: '#000000', editBg: '#ffffff', editColor: '#111111' },
+  opt: { color: '#e23b3b', size: 16, fontFamily: 'sans', bold: false, italic: false, draw: 4, hlColor: '#ffe14d', coverColor: '#000000', editBg: 'auto', editColor: '#111111' },
   selected: null,
   dirty: false,
 };
 let annoSeq = 1;
+
+/* ---------- História (Späť / Znova) ---------- */
+const history = { undo: [], redo: [] };
+function snapshot() { return JSON.stringify(state.annos); }
+function pushHistory() { history.undo.push(snapshot()); if (history.undo.length > 60) history.undo.shift(); history.redo.length = 0; updateUndoButtons(); }
+function restore(json) { state.annos = JSON.parse(json); state.selected = null; state.pageViews.forEach(renderAnnos); updateUndoButtons(); state.dirty = true; }
+function doUndo() { if (!history.undo.length) return; history.redo.push(snapshot()); restore(history.undo.pop()); toast('Späť'); }
+function doRedo() { if (!history.redo.length) return; history.undo.push(snapshot()); restore(history.redo.pop()); toast('Znova'); }
+function updateUndoButtons() { const u = $('#btnUndo'), r = $('#btnRedo'); if (u) u.disabled = !history.undo.length; if (r) r.disabled = !history.redo.length; }
 
 /* ---------- pdf.js inicializácia ---------- */
 async function initPdfjs() {
@@ -467,6 +489,8 @@ async function loadPdf(bytes, name) {
     state.annos = {};
     state.selected = null;
     state.dirty = false;
+    history.undo.length = 0; history.redo.length = 0; updateUndoButtons();
+    search.q = ''; search.hits = []; search.idx = -1; if ($('#searchInp')) $('#searchInp').value = ''; if ($('#searchCount')) $('#searchCount').textContent = '';
     $('#fileName').textContent = state.name;
     $('#btnSave').disabled = false;
     $('#btnPrint').disabled = false;
@@ -576,9 +600,18 @@ function renderOptions() {
     box.append(colorRow('Farba zvýraznenia', 'hlColor', ['#ffe14d', '#9dff7a', '#7ad0ff', '#ff9ad0', '#ffb366']));
     box.append(el('p', { class: 'note-small', text: 'Ťahaj cez text, ktorý chceš zvýrazniť.' }));
   } else if (state.tool === 'edittext') {
-    box.append(colorRow('Pozadie pod textom', 'editBg', ['#ffffff', '#fffef7', '#f3f4f6', '#000000']));
+    const g = el('div', { class: 'opt-group' }, [el('h4', { text: 'Pozadie pod textom' })]);
+    const autoBtn = el('button', { class: 'btn' + (state.opt.editBg === 'auto' ? ' primary' : ''), text: '✨ Automaticky (podľa strany)', style: 'width:100%;margin-bottom:8px', onclick: () => { state.opt.editBg = 'auto'; renderOptions(); } });
+    g.append(autoBtn);
+    const sw = el('div', { class: 'swatches' });
+    ['#ffffff', '#fffef7', '#f3f4f6', '#000000'].forEach((c) => {
+      const d = el('div', { class: 'swatch' + (state.opt.editBg === c ? ' sel' : ''), style: `background:${c}` });
+      d.onclick = () => { state.opt.editBg = c; renderOptions(); };
+      sw.append(d);
+    });
+    g.append(sw); box.append(g);
     box.append(colorRow('Farba nového textu', 'editColor', ['#111111', '#1f2740', '#e23b3b', '#1f6feb', '#ffffff']));
-    box.append(el('p', { class: 'note-small', text: 'Klikni priamo na existujúci text v strane. Pôvodné miesto sa prekryje zvoleným pozadím a navrch napíšeš nový text. Písmo nemusí byť presne rovnaké ako originál.' }));
+    box.append(el('p', { class: 'note-small', text: 'Klikni priamo na text v strane — upraví sa celý riadok. Veľkosť a rez písma sa prevezmú automaticky, pozadie sa odhadne z okolia. Výsledok vieš doladiť nástrojom Výber.' }));
   } else if (state.tool === 'cover') {
     box.append(colorRow('Farba prekrytia', 'coverColor', ['#000000', '#ffffff', '#e23b3b', '#1f6feb', '#808080']));
     box.append(el('p', { class: 'note-small', text: 'Ťahom spravíš nepriehľadný obdĺžnik cez časť strany. Je viditeľný — každý vidí, že tam je prekrytie.' }));
@@ -610,6 +643,7 @@ function addAnno(pageIndex, anno) {
   return anno;
 }
 function deleteAnno(pageIndex, id) {
+  pushHistory();
   const arr = state.annos[pageIndex] || [];
   const i = arr.findIndex((a) => a.id === id);
   if (i >= 0) { arr.splice(i, 1); state.dirty = true; renderAnnos(state.pageViews[pageIndex]); selectAnno(null); }
@@ -621,6 +655,7 @@ function selectAnno(sel) {
 }
 function applyOptToSelected() {
   const a = state.selected?.anno; if (!a) return;
+  pushHistory();
   if (a.type === 'text' || a.type === 'note') {
     a.color = state.opt.color; a.size = state.opt.size; a.font = state.opt.fontFamily; a.bold = state.opt.bold; a.italic = state.opt.italic;
   } else if (a.type === 'rect' || a.type === 'line' || a.type === 'ink') { a.color = state.opt.color; }
@@ -748,10 +783,11 @@ function buildHitAnno(pv, a) {
 /* ---------- Drag & resize ---------- */
 function startDrag(e, pv, a, node) {
   e.preventDefault();
+  const before = snapshot(); let moved = false;
   const sx = e.clientX, sy = e.clientY;
   a._orig = snapshotPos(a);
-  const move = (ev) => dragStep(ev, pv, a, sx, sy);
-  const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); state.dirty = true; };
+  const move = (ev) => { moved = true; dragStep(ev, pv, a, sx, sy); };
+  const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); if (moved) { history.undo.push(before); history.redo.length = 0; updateUndoButtons(); state.dirty = true; } };
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);
 }
@@ -769,14 +805,16 @@ function dragStep(ev, pv, a, sx, sy) {
 }
 function startResize(e, pv, a, node, keepRatio) {
   e.preventDefault();
+  const before = snapshot(); let moved = false;
   const s = state.scale; const sx = e.clientX, sy = e.clientY; const ow = a.w, oh = a.h; const ratio = ow / oh;
   const move = (ev) => {
+    moved = true;
     let nw = ow + (ev.clientX - sx) / s; let nh = oh + (ev.clientY - sy) / s;
     if (keepRatio) { nh = nw / ratio; }
     a.w = Math.max(12, nw); a.h = Math.max(12, nh);
     renderAnnos(pv); pv.annoLayer.querySelector(`[data-id="${a.id}"]`)?.classList.add('editing');
   };
-  const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); state.dirty = true; };
+  const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); if (moved) { history.undo.push(before); history.redo.length = 0; updateUndoButtons(); state.dirty = true; } };
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
 }
 
@@ -790,11 +828,11 @@ function attachLayerHandlers(pv) {
     const t = state.tool;
     if (t === 'edittext') { editExistingText(e, pv); return; }
     if (t === 'text') {
-      selectTool('select');
+      pushHistory(); selectTool('select');
       const a = addAnno(pv.index, { type: 'text', x, y, text: 'Napíš text…', color: state.opt.color, size: state.opt.size, font: state.opt.fontFamily, bold: state.opt.bold, italic: state.opt.italic, _focus: true });
       selectAnno({ pv, anno: a });
     } else if (t === 'note') {
-      selectTool('select');
+      pushHistory(); selectTool('select');
       const a = addAnno(pv.index, { type: 'note', x, y, w: 170, text: 'Poznámka…', _focus: true });
       selectAnno({ pv, anno: a });
     } else if (t === 'draw') { startInk(e, pv, x, y); }
@@ -805,24 +843,71 @@ function attachLayerHandlers(pv) {
     else if (t === 'select') { selectAnno(null); }
   });
 }
-// Úprava existujúceho textu: prekry pôvodné miesto a napíš nový text.
+// Všetky spany na tom istom riadku ako kliknutý (pre úpravu celého riadka).
+function spansOnLine(span, pv) {
+  const r0 = span.getBoundingClientRect();
+  const cy = r0.top + r0.height / 2;
+  return [...pv.textLayer.querySelectorAll('span')]
+    .filter((sp) => sp.textContent && Math.abs((sp.getBoundingClientRect().top + sp.getBoundingClientRect().height / 2) - cy) < r0.height * 0.55)
+    .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+}
+// Poskladá text riadka a doplní medzery tam, kde je medzi spanmi väčšia medzera.
+function joinLine(spans, sizePx) {
+  let out = ''; let prevRight = null;
+  for (const sp of spans) {
+    const r = sp.getBoundingClientRect();
+    if (prevRight !== null && r.left - prevRight > sizePx * 0.25 && !/\s$/.test(out) && !/^\s/.test(sp.textContent)) out += ' ';
+    out += sp.textContent; prevRight = r.right;
+  }
+  return out.replace(/\s+/g, ' ').trim();
+}
+const rgbToHex = (r, g, b) => '#' + [r, g, b].map((v) => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, '0')).join('');
+// Odhad farby pozadia pod textom (vzorky z plátna okolo riadka).
+function sampleBg(pv, rect) {
+  try {
+    const cr = pv.canvas.getBoundingClientRect();
+    const toPx = (cx, cy) => [Math.round((cx - cr.left) / cr.width * pv.canvas.width), Math.round((cy - cr.top) / cr.height * pv.canvas.height)];
+    const ctx = pv.canvas.getContext('2d', { willReadFrequently: true });
+    const samples = [];
+    const ys = [rect.top - rect.height * 0.4, rect.bottom + rect.height * 0.4];
+    const xs = [rect.left + rect.width * 0.1, rect.left + rect.width * 0.5, rect.right - rect.width * 0.1];
+    for (const yy of ys) for (const xx of xs) {
+      const [px, py] = toPx(xx, yy);
+      if (px < 0 || py < 0 || px >= pv.canvas.width || py >= pv.canvas.height) continue;
+      const d = ctx.getImageData(px, py, 1, 1).data; samples.push([d[0], d[1], d[2]]);
+    }
+    if (!samples.length) return null;
+    const med = [0, 1, 2].map((k) => samples.map((s) => s[k]).sort((a, b) => a - b)[Math.floor(samples.length / 2)]);
+    return rgbToHex(med[0], med[1], med[2]);
+  } catch { return null; }
+}
+// Úprava existujúceho textu: prekry pôvodný riadok a napíš nový text.
 function editExistingText(e, pv) {
   const stack = document.elementsFromPoint(e.clientX, e.clientY);
   const span = stack.find((n) => n.parentElement && n.parentElement.classList.contains('textLayer'));
   if (!span || !span.textContent.trim()) { toast('Klikni priamo na existujúci text v dokumente.'); return; }
+  pushHistory();
   const s = state.scale;
-  const r = span.getBoundingClientRect();
+  const spans = spansOnLine(span, pv);
+  // zjednotený obdĺžnik riadka
   const lr = pv.annoLayer.getBoundingClientRect();
-  const x = (r.left - lr.left) / s, y = (r.top - lr.top) / s;
-  const w = r.width / s, h = r.height / s;
-  const size = (parseFloat(getComputedStyle(span).fontSize) || h * 0.9) / s;
-  const pad = Math.max(1, h * 0.12);
-  // 1) prekrytie pôvodného textu zvoleným pozadím
-  addAnno(pv.index, { type: 'cover', x: x - pad, y: y - pad, w: w + pad * 2, h: h + pad * 2, color: state.opt.editBg });
-  // 2) nový, prepísateľný text na tom istom mieste
-  const a = addAnno(pv.index, { type: 'text', x, y: y + (h - size) * 0.25, text: span.textContent, color: state.opt.editColor, size: Math.max(6, Math.round(size)), font: state.opt.fontFamily, bold: false, italic: false, _focus: true });
+  let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
+  for (const sp of spans) { const r = sp.getBoundingClientRect(); L = Math.min(L, r.left); T = Math.min(T, r.top); R = Math.max(R, r.right); B = Math.max(B, r.bottom); }
+  const clientRect = { left: L, top: T, right: R, bottom: B, width: R - L, height: B - T };
+  const x = (L - lr.left) / s, y = (T - lr.top) / s, w = (R - L) / s, h = (B - T) / s;
+  const cs = getComputedStyle(span);
+  const sizePx = parseFloat(cs.fontSize) || h * s * 0.9;
+  const size = Math.max(6, Math.round(sizePx / s));
+  const fam = /serif/i.test(cs.fontFamily) && !/sans/i.test(cs.fontFamily) ? 'serif' : (/mono|courier|consol/i.test(cs.fontFamily) ? 'mono' : 'sans');
+  const bold = (parseInt(cs.fontWeight) || 400) >= 600;
+  const italic = /italic|oblique/i.test(cs.fontStyle);
+  const bg = (state.opt.editBg === 'auto' ? (sampleBg(pv, clientRect) || '#ffffff') : state.opt.editBg);
+  const text = joinLine(spans, sizePx);
+  const pad = Math.max(1, h * 0.14);
+  addAnno(pv.index, { type: 'cover', x: x - pad, y: y - pad, w: w + pad * 2, h: h + pad * 2, color: bg });
+  const a = addAnno(pv.index, { type: 'text', x, y, text, color: state.opt.editColor, size, font: fam, bold, italic, _focus: true });
   selectTool('select'); selectAnno({ pv, anno: a });
-  toast('Prepíš text. Pôvodný ostal len prekrytý — dokument sa tým netvári ako neupravený.');
+  toast('Prepíš text. Pôvodný je prekrytý — dokument sa netvári ako neupravený.');
 }
 
 function layerPoint(pv, e) {
@@ -830,6 +915,7 @@ function layerPoint(pv, e) {
   return { x: (e.clientX - rect.left) / s, y: (e.clientY - rect.top) / s };
 }
 function startInk(e, pv, x, y) {
+  pushHistory();
   const a = { type: 'ink', color: state.opt.color, width: state.opt.draw, points: [{ x, y }] };
   a.id = annoSeq++; (state.annos[pv.index] ||= []).push(a);
   const move = (ev) => { const p = layerPoint(pv, ev); a.points.push(p); renderAnnos(pv); };
@@ -837,6 +923,7 @@ function startInk(e, pv, x, y) {
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
 }
 function startRectDrag(e, pv, x0, y0, type) {
+  pushHistory();
   const a = { type, x: x0, y: y0, w: 1, h: 1, color: type === 'highlight' ? state.opt.hlColor : (type === 'cover' ? state.opt.coverColor : state.opt.color), width: state.opt.draw };
   a.id = annoSeq++; (state.annos[pv.index] ||= []).push(a);
   const move = (ev) => { const p = layerPoint(pv, ev); a.x = Math.min(x0, p.x); a.y = Math.min(y0, p.y); a.w = Math.abs(p.x - x0); a.h = Math.abs(p.y - y0); renderAnnos(pv); };
@@ -844,6 +931,7 @@ function startRectDrag(e, pv, x0, y0, type) {
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
 }
 function startLineDrag(e, pv, x0, y0) {
+  pushHistory();
   const a = { type: 'line', x1: x0, y1: y0, x2: x0, y2: y0, color: state.opt.color, width: state.opt.draw };
   a.id = annoSeq++; (state.annos[pv.index] ||= []).push(a);
   const move = (ev) => { const p = layerPoint(pv, ev); a.x2 = p.x; a.y2 = p.y; renderAnnos(pv); };
@@ -861,6 +949,7 @@ $('#hiddenImg').addEventListener('change', async (e) => {
   await img.decode().catch(() => {});
   const pv = state.pageViews[0]; if (!pv) return;
   const maxW = pv.vp1.width * 0.5; let w = Math.min(img.naturalWidth || 200, maxW); let h = w * ((img.naturalHeight || 150) / (img.naturalWidth || 200));
+  pushHistory();
   const a = addAnno(0, { type: 'image', x: pv.vp1.width / 2 - w / 2, y: pv.vp1.height / 2 - h / 2, w, h, dataUrl });
   selectTool('select'); selectAnno({ pv, anno: a });
   toast('Obrázok vložený. Potiahni ho na miesto.');
@@ -978,6 +1067,29 @@ async function setZoom(z) {
   $('#zoomVal').textContent = Math.round(state.scale * 100) + ' %';
   if (state.pdf) { const sc = $('#viewer').scrollTop; await renderAll(); $('#viewer').scrollTop = sc; }
 }
+
+/* ---------- Vyhľadávanie v dokumente ---------- */
+const search = { q: '', hits: [], idx: -1 };
+function clearSearchMarks() { $$('.textLayer span.search-hit, .textLayer span.search-cur').forEach((n) => n.classList.remove('search-hit', 'search-cur')); }
+function runSearch(q) {
+  clearSearchMarks(); search.q = q; search.hits = []; search.idx = -1;
+  const needle = q.trim().toLowerCase();
+  if (!needle) { $('#searchCount').textContent = ''; return; }
+  for (const pv of state.pageViews) {
+    for (const sp of pv.textLayer.querySelectorAll('span')) {
+      if (sp.textContent && sp.textContent.toLowerCase().includes(needle)) { sp.classList.add('search-hit'); search.hits.push(sp); }
+    }
+  }
+  if (search.hits.length) { search.idx = 0; focusHit(); }
+  $('#searchCount').textContent = search.hits.length ? `${search.idx + 1}/${search.hits.length}` : 'nič';
+}
+function focusHit() {
+  $$('.textLayer span.search-cur').forEach((n) => n.classList.remove('search-cur'));
+  const sp = search.hits[search.idx]; if (!sp) return;
+  sp.classList.add('search-cur'); sp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('#searchCount').textContent = `${search.idx + 1}/${search.hits.length}`;
+}
+function searchStep(d) { if (!search.hits.length) return; search.idx = (search.idx + d + search.hits.length) % search.hits.length; focusHit(); }
 
 /* ---------- Tlač, skok na stranu, na šírku ---------- */
 async function printPdf() {
@@ -1539,6 +1651,12 @@ function wire() {
   $('#btnHelp').onclick = openHelp;
   $('#goPage').addEventListener('change', (e) => goToPage(+e.target.value));
   $('#fitWidth').onclick = fitWidth;
+  $('#btnUndo').onclick = doUndo;
+  $('#btnRedo').onclick = doRedo;
+  let searchT; $('#searchInp').addEventListener('input', (e) => { clearTimeout(searchT); searchT = setTimeout(() => runSearch(e.target.value), 250); });
+  $('#searchInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchStep(e.shiftKey ? -1 : 1); } });
+  $('#searchNext').onclick = () => searchStep(1);
+  $('#searchPrev').onclick = () => searchStep(-1);
   $('#btnMood').onclick = () => $('#moodModal').classList.remove('hidden');
   $('#sheetClose').onclick = closeSheet;
   $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
@@ -1552,6 +1670,9 @@ function wire() {
   $('#zoomOut').onclick = () => setZoom(state.scale - 0.15);
   document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (!$('#btnSave').disabled) savePdf(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f')) { e.preventDefault(); $('#searchInp').focus(); $('#searchInp').select(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { if (document.activeElement && document.activeElement.isContentEditable) return; e.preventDefault(); doUndo(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) { if (document.activeElement && document.activeElement.isContentEditable) return; e.preventDefault(); doRedo(); }
     if (e.key === 'Delete' && state.selected && !state.selected.anno._editing) {
       if (document.activeElement && document.activeElement.isContentEditable) return;
       deleteAnno(state.selected.pv.index, state.selected.anno.id);

@@ -50,6 +50,14 @@
     <div class="file-controls">
       <button class="btn" id="btnOpen">📂 Otvoriť PDF</button>
       <button class="btn" id="btnSave" disabled>💾 Uložiť PDF</button>
+      <button class="btn ghost" id="btnUndo" title="Späť (Ctrl+Z)" disabled>↶</button>
+      <button class="btn ghost" id="btnRedo" title="Znova (Ctrl+Y)" disabled>↷</button>
+      <span class="search-box">
+        <input id="searchInp" type="text" placeholder="Hľadať v dokumente…">
+        <button class="btn mini" id="searchPrev" title="Predošlé">↑</button>
+        <button class="btn mini" id="searchNext" title="Ďalšie">↓</button>
+        <span id="searchCount" class="muted"></span>
+      </span>
       <span class="filename" id="fileName">žiadny súbor</span>
     </div>
     <div class="top-right">
