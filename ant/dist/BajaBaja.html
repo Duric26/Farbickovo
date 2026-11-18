@@ -233,6 +233,7 @@ body{
     <nav class="toolbar" id="toolbar">
       <button class="tool" data-tool="select" title="Výber / posun"><span>🖐️</span>Výber</button>
       <button class="tool" data-tool="text" title="Pridať text"><span>🅣</span>Text</button>
+      <button class="tool" data-tool="edittext" title="Upraviť existujúci text"><span>✎</span>Upraviť text</button>
       <button class="tool" data-tool="image" title="Vložiť obrázok"><span>🖼️</span>Obrázok</button>
       <button class="tool" data-tool="draw" title="Kresliť"><span>✏️</span>Kresliť</button>
       <button class="tool" data-tool="highlight" title="Zvýrazniť"><span>🖍️</span>Zvýrazniť</button>
@@ -441,7 +442,7 @@ const state = {
   tool: 'select',
   annos: {},           // {pageIndex: [anno]}
   pageViews: [],       // {pageEl, canvas, annoLayer, viewport, vp1}
-  opt: { color: '#e23b3b', size: 16, fontFamily: 'sans', bold: false, italic: false, draw: 4, hlColor: '#ffe14d', coverColor: '#000000' },
+  opt: { color: '#e23b3b', size: 16, fontFamily: 'sans', bold: false, italic: false, draw: 4, hlColor: '#ffe14d', coverColor: '#000000', editBg: '#ffffff', editColor: '#111111' },
   selected: null,
   dirty: false,
 };
@@ -574,6 +575,10 @@ function renderOptions() {
   } else if (state.tool === 'highlight') {
     box.append(colorRow('Farba zvýraznenia', 'hlColor', ['#ffe14d', '#9dff7a', '#7ad0ff', '#ff9ad0', '#ffb366']));
     box.append(el('p', { class: 'note-small', text: 'Ťahaj cez text, ktorý chceš zvýrazniť.' }));
+  } else if (state.tool === 'edittext') {
+    box.append(colorRow('Pozadie pod textom', 'editBg', ['#ffffff', '#fffef7', '#f3f4f6', '#000000']));
+    box.append(colorRow('Farba nového textu', 'editColor', ['#111111', '#1f2740', '#e23b3b', '#1f6feb', '#ffffff']));
+    box.append(el('p', { class: 'note-small', text: 'Klikni priamo na existujúci text v strane. Pôvodné miesto sa prekryje zvoleným pozadím a navrch napíšeš nový text. Písmo nemusí byť presne rovnaké ako originál.' }));
   } else if (state.tool === 'cover') {
     box.append(colorRow('Farba prekrytia', 'coverColor', ['#000000', '#ffffff', '#e23b3b', '#1f6feb', '#808080']));
     box.append(el('p', { class: 'note-small', text: 'Ťahom spravíš nepriehľadný obdĺžnik cez časť strany. Je viditeľný — každý vidí, že tam je prekrytie.' }));
@@ -783,6 +788,7 @@ function attachLayerHandlers(pv) {
     const s = state.scale; const rect = layer.getBoundingClientRect();
     const x = (e.clientX - rect.left) / s, y = (e.clientY - rect.top) / s;
     const t = state.tool;
+    if (t === 'edittext') { editExistingText(e, pv); return; }
     if (t === 'text') {
       selectTool('select');
       const a = addAnno(pv.index, { type: 'text', x, y, text: 'Napíš text…', color: state.opt.color, size: state.opt.size, font: state.opt.fontFamily, bold: state.opt.bold, italic: state.opt.italic, _focus: true });
@@ -799,6 +805,26 @@ function attachLayerHandlers(pv) {
     else if (t === 'select') { selectAnno(null); }
   });
 }
+// Úprava existujúceho textu: prekry pôvodné miesto a napíš nový text.
+function editExistingText(e, pv) {
+  const stack = document.elementsFromPoint(e.clientX, e.clientY);
+  const span = stack.find((n) => n.parentElement && n.parentElement.classList.contains('textLayer'));
+  if (!span || !span.textContent.trim()) { toast('Klikni priamo na existujúci text v dokumente.'); return; }
+  const s = state.scale;
+  const r = span.getBoundingClientRect();
+  const lr = pv.annoLayer.getBoundingClientRect();
+  const x = (r.left - lr.left) / s, y = (r.top - lr.top) / s;
+  const w = r.width / s, h = r.height / s;
+  const size = (parseFloat(getComputedStyle(span).fontSize) || h * 0.9) / s;
+  const pad = Math.max(1, h * 0.12);
+  // 1) prekrytie pôvodného textu zvoleným pozadím
+  addAnno(pv.index, { type: 'cover', x: x - pad, y: y - pad, w: w + pad * 2, h: h + pad * 2, color: state.opt.editBg });
+  // 2) nový, prepísateľný text na tom istom mieste
+  const a = addAnno(pv.index, { type: 'text', x, y: y + (h - size) * 0.25, text: span.textContent, color: state.opt.editColor, size: Math.max(6, Math.round(size)), font: state.opt.fontFamily, bold: false, italic: false, _focus: true });
+  selectTool('select'); selectAnno({ pv, anno: a });
+  toast('Prepíš text. Pôvodný ostal len prekrytý — dokument sa tým netvári ako neupravený.');
+}
+
 function layerPoint(pv, e) {
   const s = state.scale; const rect = pv.annoLayer.getBoundingClientRect();
   return { x: (e.clientX - rect.left) / s, y: (e.clientY - rect.top) / s };
@@ -1480,6 +1506,7 @@ function openHelp() {
     h('Otvoriť dokument'); p('Klikni hore na „Otvoriť PDF“, alebo súbor jednoducho pretiahni do okna.');
     h('Pridať text / obrázok / kresbu'); p('Vľavo si vyber nástroj. Text: klikni do strany a píš, vieš meniť písmo, veľkosť aj farbu. Obrázok: vlož fotku a potiahni ju na miesto. Kresliť, zvýrazňovať, rámiky, čiary a lístky fungujú ťahaním myšou.');
     h('Posúvanie a mazanie'); p('Nástrojom „Výber“ doplnok potiahneš alebo prepíšeš. Nástrojom „Guma“ (alebo krížikom) ho zmažeš. Pôvodný obsah PDF ostáva nedotknutý.');
+    h('Upraviť existujúci text'); p('Nástrojom „Upraviť text“ klikni priamo na text v dokumente. Pôvodné miesto sa prekryje pozadím a navrch napíšeš nový text. Písmo nemusí byť presne rovnaké ako originál a úprava neskrýva, že sa dokument menil (elektronický podpis po úprave prestane platiť). Vhodné na opravy a úpravu vlastných dokumentov.');
     h('Prekrytie'); p('Nástrojom „Prekryť“ spravíš nepriehľadný (napr. čierny) obdĺžnik cez časť strany. Je viditeľný — slúži na zakrytie, nie na skrývanie úprav.');
     h('Strany'); p('V časti „Strany“ vieš strany otáčať, mazať, duplikovať, meniť poradie ťahaním, pripojiť ďalšie PDF, vybrať strany do nového súboru, pridať prázdnu stranu, vložiť vodoznak alebo očíslovať strany.');
     h('Tlač'); p('Ikonou 🖨️ hore otvoríš hotový dokument s doplnkami na tlač.');
