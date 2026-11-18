@@ -18,7 +18,7 @@ Vaša vlastná dielnička na PDF. Nie kúpený program — vlastná appka, sprav
 
 ## Prvé spustenie
 
-- Vyberiete si, **kto otvára dielničku** (Baja #1 / Baja #2 / obaja).
+- Vyberiete si, **kto otvára dielničku** (Pája 1 / Pája 2 / obaja).
 - Dielnička sa spýta, **ako sa dnes máte**, a podľa nálady sa zafarbí.
 - Potom už ste v dielničke. Náladu viete kedykoľvek zmeniť ikonou 🎨 vpravo hore.
 
@@ -39,8 +39,14 @@ Kliknite hore na **Otvoriť PDF**, alebo súbor jednoducho **pretiahnite do okna
 - **Výber** — doplnok posuniete alebo prepíšete.
 - **Guma** — doplnok zmažete (pôvodný obsah PDF ostáva nedotknutý).
 
+### Prekrytie
+Nástroj **Prekryť** spraví nepriehľadný (napr. čierny) obdĺžnik cez časť strany. Je viditeľný — slúži na zakrytie údaja, nie na skrývanie, že sa dokument menil.
+
 ### Strany
-Otáčanie, mazanie, **zmena poradia ťahaním**, **pripojenie ďalšieho PDF**, **výber strán** do nového súboru (napr. `1-3,5`).
+Otáčanie, mazanie, **duplikovanie**, **zmena poradia ťahaním**, **pripojenie ďalšieho PDF**, **výber strán** do nového súboru (napr. `1-3,5`), **prázdna strana**, **vodoznak** (napr. NÁVRH/KÓPIA šikmo cez strany) a **číslovanie strán**.
+
+### Tlač
+Ikonou 🖨️ hore otvoríš hotový dokument aj s doplnkami rovno na tlač.
 
 ### Formulár
 Ak má PDF interaktívne políčka, vyplníte ich a uložíte.

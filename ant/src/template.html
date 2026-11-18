@@ -21,8 +21,8 @@
     <div class="who">
       <p class="who-q">Kto dnes otvára dielničku?</p>
       <div class="who-row">
-        <button class="who-btn" data-who="Baja #1">🐜 Baja #1</button>
-        <button class="who-btn" data-who="Baja #2">🐜 Baja #2</button>
+        <button class="who-btn" data-who="Pája 1">🐜 Pája 1</button>
+        <button class="who-btn" data-who="Pája 2">🐜 Pája 2</button>
         <button class="who-btn" data-who="obaja">💛 Obaja spolu</button>
       </div>
     </div>
@@ -53,6 +53,7 @@
       <span class="filename" id="fileName">žiadny súbor</span>
     </div>
     <div class="top-right">
+      <button class="btn ghost" id="btnPrint" title="Tlačiť" disabled>🖨️</button>
       <button class="btn ghost" id="btnMood" title="Zmeniť náladu">🎨</button>
       <button class="btn ghost" id="btnHelp" title="Návod">❔</button>
     </div>
@@ -68,6 +69,7 @@
       <button class="tool" data-tool="rect" title="Obdĺžnik"><span>▭</span>Rámik</button>
       <button class="tool" data-tool="line" title="Čiara"><span>／</span>Čiara</button>
       <button class="tool" data-tool="note" title="Nalepovací lístok"><span>🗒️</span>Lístok</button>
+      <button class="tool" data-tool="cover" title="Čierne prekrytie (viditeľné)"><span>⬛</span>Prekryť</button>
       <button class="tool" data-tool="erase" title="Zmazať doplnok"><span>🧽</span>Guma</button>
       <hr>
       <button class="tool" id="btnPages" title="Strany"><span>📑</span>Strany</button>
@@ -93,6 +95,8 @@
   <footer class="statusbar">
     <span id="status">Pripravené.</span>
     <span class="zoom-controls">
+      <span class="page-jump">Strana <input id="goPage" type="number" min="1" value="1" style="width:52px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:2px 4px"> / <span id="pageTotal">–</span></span>
+      <button class="btn mini" id="fitWidth" title="Prispôsobiť na šírku">↔ Na šírku</button>
       <button class="btn mini" id="zoomOut">–</button>
       <span id="zoomVal">100 %</span>
       <button class="btn mini" id="zoomIn">+</button>

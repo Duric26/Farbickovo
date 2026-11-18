@@ -63,7 +63,7 @@ const state = {
   tool: 'select',
   annos: {},           // {pageIndex: [anno]}
   pageViews: [],       // {pageEl, canvas, annoLayer, viewport, vp1}
-  opt: { color: '#e23b3b', size: 16, fontFamily: 'sans', bold: false, italic: false, draw: 4, hlColor: '#ffe14d' },
+  opt: { color: '#e23b3b', size: 16, fontFamily: 'sans', bold: false, italic: false, draw: 4, hlColor: '#ffe14d', coverColor: '#000000' },
   selected: null,
   dirty: false,
 };
@@ -90,8 +90,11 @@ async function loadPdf(bytes, name) {
     state.dirty = false;
     $('#fileName').textContent = state.name;
     $('#btnSave').disabled = false;
+    $('#btnPrint').disabled = false;
     $('#welcome').classList.add('hidden');
     await renderAll();
+    $('#pageTotal').textContent = state.pdf.numPages;
+    $('#goPage').max = state.pdf.numPages; $('#goPage').value = 1;
     status(`${state.pdf.numPages} strán · ${state.name}`);
     toast('Dokument je otvorený 🐜');
   } catch (e) {
@@ -193,6 +196,9 @@ function renderOptions() {
   } else if (state.tool === 'highlight') {
     box.append(colorRow('Farba zvýraznenia', 'hlColor', ['#ffe14d', '#9dff7a', '#7ad0ff', '#ff9ad0', '#ffb366']));
     box.append(el('p', { class: 'note-small', text: 'Ťahaj cez text, ktorý chceš zvýrazniť.' }));
+  } else if (state.tool === 'cover') {
+    box.append(colorRow('Farba prekrytia', 'coverColor', ['#000000', '#ffffff', '#e23b3b', '#1f6feb', '#808080']));
+    box.append(el('p', { class: 'note-small', text: 'Ťahom spravíš nepriehľadný obdĺžnik cez časť strany. Je viditeľný — každý vidí, že tam je prekrytie.' }));
   } else if (state.tool === 'rect' || state.tool === 'line') {
     box.append(colorRow('Farba', 'color', palette));
     const g = el('div', { class: 'opt-group' }, [el('h4', { text: 'Hrúbka' })]);
@@ -261,6 +267,10 @@ function renderAnnos(pv) {
       const r = document.createElementNS(ns, 'rect');
       r.setAttribute('x', a.x * s); r.setAttribute('y', a.y * s); r.setAttribute('width', a.w * s); r.setAttribute('height', a.h * s);
       r.setAttribute('fill', a.color); r.setAttribute('fill-opacity', '0.4'); svg.append(r);
+    } else if (a.type === 'cover') {
+      const r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', a.x * s); r.setAttribute('y', a.y * s); r.setAttribute('width', a.w * s); r.setAttribute('height', a.h * s);
+      r.setAttribute('fill', a.color || '#000000'); svg.append(r);
     } else if (a.type === 'rect') {
       const r = document.createElementNS(ns, 'rect');
       r.setAttribute('x', a.x * s); r.setAttribute('y', a.y * s); r.setAttribute('width', a.w * s); r.setAttribute('height', a.h * s);
@@ -276,7 +286,7 @@ function renderAnnos(pv) {
     if (a.type === 'text') pv.annoLayer.append(buildTextAnno(pv, a));
     else if (a.type === 'note') pv.annoLayer.append(buildNoteAnno(pv, a));
     else if (a.type === 'image') pv.annoLayer.append(buildImageAnno(pv, a));
-    else if (a.type === 'ink' || a.type === 'highlight' || a.type === 'rect' || a.type === 'line') {
+    else if (a.type === 'ink' || a.type === 'highlight' || a.type === 'rect' || a.type === 'cover' || a.type === 'line') {
       // neviditeľný „hit“ prvok na výber/zmazanie
       pv.annoLayer.append(buildHitAnno(pv, a));
     }
@@ -405,6 +415,7 @@ function attachLayerHandlers(pv) {
       selectAnno({ pv, anno: a });
     } else if (t === 'draw') { startInk(e, pv, x, y); }
     else if (t === 'highlight') { startRectDrag(e, pv, x, y, 'highlight'); }
+    else if (t === 'cover') { startRectDrag(e, pv, x, y, 'cover'); }
     else if (t === 'rect') { startRectDrag(e, pv, x, y, 'rect'); }
     else if (t === 'line') { startLineDrag(e, pv, x, y); }
     else if (t === 'select') { selectAnno(null); }
@@ -422,7 +433,7 @@ function startInk(e, pv, x, y) {
   document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
 }
 function startRectDrag(e, pv, x0, y0, type) {
-  const a = { type, x: x0, y: y0, w: 1, h: 1, color: type === 'highlight' ? state.opt.hlColor : state.opt.color, width: state.opt.draw };
+  const a = { type, x: x0, y: y0, w: 1, h: 1, color: type === 'highlight' ? state.opt.hlColor : (type === 'cover' ? state.opt.coverColor : state.opt.color), width: state.opt.draw };
   a.id = annoSeq++; (state.annos[pv.index] ||= []).push(a);
   const move = (ev) => { const p = layerPoint(pv, ev); a.x = Math.min(x0, p.x); a.y = Math.min(y0, p.y); a.w = Math.abs(p.x - x0); a.h = Math.abs(p.y - y0); renderAnnos(pv); };
   const up = () => { document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); if (a.w < 3 && a.h < 3) deleteAnno(pv.index, a.id); else { state.dirty = true; renderAnnos(pv); } };
@@ -522,10 +533,11 @@ async function buildOutputPdf() {
           const img = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes).catch(async () => await pdfDoc.embedPng(bytes));
           const bl = conv(a.x, a.y + a.h); // vizuálny ľavý-dolný roh
           page.drawImage(img, { x: bl.x, y: bl.y, width: a.w, height: a.h, rotate: degrees(ang) });
-        } else if (a.type === 'highlight' || a.type === 'rect') {
+        } else if (a.type === 'highlight' || a.type === 'rect' || a.type === 'cover') {
           const tl = conv(a.x, a.y), br = conv(a.x + a.w, a.y + a.h);
           const x = Math.min(tl.x, br.x), y = Math.min(tl.y, br.y), w = Math.abs(br.x - tl.x), h = Math.abs(br.y - tl.y);
           if (a.type === 'highlight') page.drawRectangle({ x, y, width: w, height: h, color: hex(a.color), opacity: 0.4 });
+          else if (a.type === 'cover') page.drawRectangle({ x, y, width: w, height: h, color: hex(a.color || '#000000'), opacity: 1 });
           else page.drawRectangle({ x, y, width: w, height: h, borderColor: hex(a.color), borderWidth: a.width || 2, opacity: 0 });
         } else if (a.type === 'line') {
           const p1 = conv(a.x1, a.y1), p2 = conv(a.x2, a.y2);
@@ -563,6 +575,31 @@ async function setZoom(z) {
   if (state.pdf) { const sc = $('#viewer').scrollTop; await renderAll(); $('#viewer').scrollTop = sc; }
 }
 
+/* ---------- Tlač, skok na stranu, na šírku ---------- */
+async function printPdf() {
+  if (!state.bytes) return;
+  busy.show('Pripravujem tlač…');
+  try {
+    const pdfDoc = await buildOutputPdf();
+    const out = await pdfDoc.save({ useObjectStreams: true });
+    const url = URL.createObjectURL(new Blob([out], { type: 'application/pdf' }));
+    const w = window.open(url, '_blank');
+    if (w) { w.addEventListener('load', () => { try { w.focus(); w.print(); } catch {} }); toast('Dokument sa otvoril — vytlač ho cez ponuku prehliadača.'); }
+    else { download(out, outName(state.name)); toast('Prehliadač zablokoval okno — súbor sa stiahol, otvor a vytlač ho.'); }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) { console.error(e); toast('Tlač zlyhala.'); } finally { busy.hide(); }
+}
+function goToPage(n) {
+  const i = Math.max(1, Math.min(state.pdf?.numPages || 1, n | 0));
+  const pv = state.pageViews[i - 1]; if (pv) pv.wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function fitWidth() {
+  if (!state.pdf) return;
+  const pv = state.pageViews[0]; if (!pv) return;
+  const avail = $('#viewer').clientWidth - 56;
+  await setZoom(avail / pv.vp1.width);
+}
+
 /* ========== DIALÓGY ========== */
 function openSheet(title, buildFn) {
   const body = $('#sheetBody'); body.innerHTML = '';
@@ -580,6 +617,9 @@ async function openPages() {
     const actions = el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:10px 0' }, [
       el('button', { class: 'btn', text: '➕ Pripojiť iné PDF', onclick: () => $('#hiddenMerge').click() }),
       el('button', { class: 'btn', text: '✂️ Rozdeliť / vybrať strany', onclick: openSplit }),
+      el('button', { class: 'btn', text: '📄 Prázdna strana', onclick: addBlankPage }),
+      el('button', { class: 'btn', text: '💧 Vodoznak', onclick: addWatermark }),
+      el('button', { class: 'btn', text: '🔢 Číslovať strany', onclick: addPageNumbers }),
     ]);
     body.append(actions);
     const grid = el('div', { class: 'thumbs' }); body.append(grid);
@@ -602,6 +642,7 @@ async function renderThumbs(grid, order) {
     const tools = el('div', { class: 'thumb-tools' }, [
       el('button', { text: '↺', title: 'Otočiť vľavo', onclick: () => rotatePage(pi, -90) }),
       el('button', { text: '↻', title: 'Otočiť vpravo', onclick: () => rotatePage(pi, 90) }),
+      el('button', { text: '⧉', title: 'Duplikovať stranu', onclick: () => duplicatePage(pi) }),
       el('button', { text: '🗑', title: 'Zmazať stranu', onclick: () => removePage(pi) }),
     ]);
     t.append(tools);
@@ -690,6 +731,73 @@ function parseRanges(s, max) {
     for (let i = Math.min(a, b); i <= Math.max(a, b); i++) if (i >= 1 && i <= max) out.add(i - 1);
   }
   return [...out];
+}
+
+/* ---------- Vodoznak, číslovanie, prázdna/duplikovaná strana ---------- */
+async function addWatermark() {
+  openSheet('Vodoznak', (body) => {
+    body.append(el('p', { class: 'note-small', text: 'Text sa šikmo pretlačí cez všetky strany (napr. NÁVRH, KÓPIA, DÔVERNÉ).' }));
+    const inp = el('input', { type: 'text', value: 'NÁVRH', style: 'width:100%;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--ink);margin:8px 0' });
+    body.append(inp);
+    const op = el('input', { type: 'range', min: 5, max: 60, value: 18 });
+    body.append(el('div', { class: 'opt-row' }, [el('label', { text: 'Priehľadnosť' }), op]));
+    body.append(el('button', { class: 'btn primary', text: 'Pridať vodoznak', onclick: async () => {
+      const text = inp.value.trim(); if (!text) return;
+      busy.show('Pridávam vodoznak…');
+      try { await flattenCurrent();
+        const { PDFDocument, degrees, rgb } = PDFLib; const doc = await PDFDocument.load(state.bytes, { ignoreEncryption: true });
+        doc.registerFontkit(fontkit); const font = await doc.embedFont(b64ToBytes(FONTS.sansB), { subset: true });
+        const opacity = (+op.value) / 100;
+        for (const page of doc.getPages()) {
+          const { width, height } = page.getSize(); const size = Math.max(24, Math.min(width, height) / 8);
+          const tw = font.widthOfTextAtSize(text, size);
+          page.drawText(text, { x: width / 2 - tw / 2 * 0.7, y: height / 2 - size / 2, size, font, color: rgb(0.5, 0.5, 0.5), opacity, rotate: degrees(45) });
+        }
+        state.bytes = await doc.save(); await reloadFrom(state.bytes); toast('Vodoznak pridaný.');
+      } catch (e) { console.error(e); toast('Vodoznak zlyhal.'); } finally { busy.hide(); }
+    } }));
+  });
+}
+async function addPageNumbers() {
+  openSheet('Číslovať strany', (body) => {
+    body.append(el('p', { class: 'note-small', text: 'Dole v strede pribudne číslo strany.' }));
+    const fmtSel = el('select', { style: 'width:100%;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--ink);margin:8px 0' });
+    [['n', '1, 2, 3 …'], ['n_total', '1 / N'], ['strana_n', 'Strana 1']].forEach(([v, t]) => fmtSel.append(el('option', { value: v, text: t })));
+    body.append(fmtSel);
+    body.append(el('button', { class: 'btn primary', text: 'Pridať čísla strán', onclick: async () => {
+      busy.show('Číslujem strany…');
+      try { await flattenCurrent();
+        const { PDFDocument, rgb } = PDFLib; const doc = await PDFDocument.load(state.bytes, { ignoreEncryption: true });
+        doc.registerFontkit(fontkit); const font = await doc.embedFont(b64ToBytes(FONTS.sans), { subset: true });
+        const pages = doc.getPages();
+        pages.forEach((page, i) => {
+          const { width } = page.getSize(); let t = String(i + 1);
+          if (fmtSel.value === 'n_total') t = `${i + 1} / ${pages.length}`; else if (fmtSel.value === 'strana_n') t = `Strana ${i + 1}`;
+          const size = 10; const tw = font.widthOfTextAtSize(t, size);
+          page.drawText(t, { x: width / 2 - tw / 2, y: 18, size, font, color: rgb(0.2, 0.2, 0.2) });
+        });
+        state.bytes = await doc.save(); await reloadFrom(state.bytes); toast('Strany očíslované.');
+      } catch (e) { console.error(e); toast('Číslovanie zlyhalo.'); } finally { busy.hide(); }
+    } }));
+  });
+}
+async function addBlankPage() {
+  busy.show('Pridávam prázdnu stranu…');
+  try { await flattenCurrent();
+    const { PDFDocument } = PDFLib; const doc = await PDFDocument.load(state.bytes, { ignoreEncryption: true });
+    const last = doc.getPage(doc.getPageCount() - 1); const { width, height } = last.getSize();
+    doc.addPage([width, height]); state.bytes = await doc.save(); await reloadFrom(state.bytes); toast('Prázdna strana pridaná na koniec.');
+  } catch (e) { console.error(e); toast('Nepodarilo sa.'); } finally { busy.hide(); openPages(); }
+}
+async function duplicatePage(pi) {
+  busy.show('Duplikujem stranu…');
+  try { await flattenCurrent();
+    const { PDFDocument } = PDFLib; const src = await PDFDocument.load(state.bytes, { ignoreEncryption: true });
+    const out = await PDFDocument.create();
+    const order = []; for (let i = 0; i < src.getPageCount(); i++) { order.push(i); if (i === pi) order.push(i); }
+    const cp = await out.copyPages(src, order); cp.forEach((p) => out.addPage(p));
+    state.bytes = await out.save(); await reloadFrom(state.bytes); toast('Strana zduplikovaná.');
+  } catch (e) { console.error(e); toast('Duplikovanie zlyhalo.'); } finally { busy.hide(); openPages(); }
 }
 
 /* ---------- Formuláre ---------- */
@@ -939,11 +1047,11 @@ const MOODS = [
   { k: 'unava', emo: '🥱', t: 'Únava', theme: 'unava' },
   { k: 'hnev', emo: '😤', t: 'Nabrúsenosť', theme: 'hnev' },
 ];
-const DED = `Pre Baju a Baju 🐜
+const DED = `Pre Páju 1 a Páju 2 🐜
 od Robka Ďuriča.
 
-Nekúpili sme vám hotový program.
-Radšej sme vám spravili vlastný —
+Nekúpil som vám hotový program.
+Radšej som vám spravil vlastný —
 taký, aký ste vy dvaja.
 Nech slúži a nech vás teší.`;
 
@@ -994,7 +1102,9 @@ function openHelp() {
     h('Otvoriť dokument'); p('Klikni hore na „Otvoriť PDF“, alebo súbor jednoducho pretiahni do okna.');
     h('Pridať text / obrázok / kresbu'); p('Vľavo si vyber nástroj. Text: klikni do strany a píš, vieš meniť písmo, veľkosť aj farbu. Obrázok: vlož fotku a potiahni ju na miesto. Kresliť, zvýrazňovať, rámiky, čiary a lístky fungujú ťahaním myšou.');
     h('Posúvanie a mazanie'); p('Nástrojom „Výber“ doplnok potiahneš alebo prepíšeš. Nástrojom „Guma“ (alebo krížikom) ho zmažeš. Pôvodný obsah PDF ostáva nedotknutý.');
-    h('Strany'); p('V časti „Strany“ vieš strany otáčať, mazať, meniť poradie ťahaním, pripojiť ďalšie PDF alebo vybrať len niektoré strany do nového súboru.');
+    h('Prekrytie'); p('Nástrojom „Prekryť“ spravíš nepriehľadný (napr. čierny) obdĺžnik cez časť strany. Je viditeľný — slúži na zakrytie, nie na skrývanie úprav.');
+    h('Strany'); p('V časti „Strany“ vieš strany otáčať, mazať, duplikovať, meniť poradie ťahaním, pripojiť ďalšie PDF, vybrať strany do nového súboru, pridať prázdnu stranu, vložiť vodoznak alebo očíslovať strany.');
+    h('Tlač'); p('Ikonou 🖨️ hore otvoríš hotový dokument s doplnkami na tlač.');
     h('Formulár'); p('Ak má PDF interaktívne políčka, vyplníš ich v časti „Formulár“ a uložíš.');
     h('OCR'); p('Pri naskenovaných dokumentoch prečíta text z obrázka, aby sa dal skopírovať. Prvýkrát si stiahne jazykový balík z internetu.');
     h('Konverzie'); p('PDF premeníš na obrázky, text alebo Word, z obrázkov spravíš PDF, dokument zmenšíš alebo z neho odstrániš údaje o autorovi.');
@@ -1020,7 +1130,10 @@ function wire() {
   $('#btnOpen').onclick = () => $('#hiddenFile').click();
   $('#hiddenFile').addEventListener('change', async (e) => { const f = e.target.files[0]; e.target.value = ''; if (f) loadPdf(await f.arrayBuffer(), f.name); });
   $('#btnSave').onclick = savePdf;
+  $('#btnPrint').onclick = printPdf;
   $('#btnHelp').onclick = openHelp;
+  $('#goPage').addEventListener('change', (e) => goToPage(+e.target.value));
+  $('#fitWidth').onclick = fitWidth;
   $('#btnMood').onclick = () => $('#moodModal').classList.remove('hidden');
   $('#sheetClose').onclick = closeSheet;
   $('#sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
