@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Baja &amp; Baja — PDF dielnička</title>
+<meta name="description" content="Súkromná PDF dielnička pre Baju a Baju. Darček od Robka.">
+<!--STYLES-->
+</head>
+<body data-theme="pokoj">
+
+<!-- Úvodná obrazovka / darček -->
+<div id="intro" class="intro">
+  <div class="intro-card">
+    <div class="ant-hero" aria-hidden="true">
+      <svg viewBox="0 0 120 120" class="ant-svg"><use href="#antGlyph"/></svg>
+    </div>
+    <h1>Baja &amp; Baja</h1>
+    <p class="intro-sub">Vaša vlastná PDF dielnička</p>
+    <p class="intro-ded" id="introDed"></p>
+    <div class="who">
+      <p class="who-q">Kto dnes otvára dielničku?</p>
+      <div class="who-row">
+        <button class="who-btn" data-who="Pája">🐜 Pája</button>
+        <button class="who-btn" data-who="Pája">🐜 Pája</button>
+        <button class="who-btn" data-who="obaja">💛 Obaja spolu</button>
+      </div>
+    </div>
+    <button id="introSkip" class="link-btn">Preskočiť rovno do dielničky →</button>
+  </div>
+</div>
+
+<!-- Otázka na náladu -->
+<div id="moodModal" class="modal hidden">
+  <div class="modal-card">
+    <h2 id="moodHi">Ako sa dnes máš?</h2>
+    <p class="muted">Podľa nálady sa dielnička ladí do inej farby.</p>
+    <div class="mood-grid" id="moodGrid"></div>
+    <textarea id="moodNote" placeholder="(nepovinné) Čo ti dnes behá hlavou…"></textarea>
+    <div class="modal-actions">
+      <button id="moodSave" class="btn primary">Poďme na to</button>
+    </div>
+  </div>
+</div>
+
+<!-- Hlavná aplikácia -->
+<div id="app" class="app hidden">
+  <header class="topbar">
+    <div class="brand"><svg viewBox="0 0 120 120" class="brand-ant"><use href="#antGlyph"/></svg><span>Baja &amp; Baja</span></div>
+    <div class="file-controls">
+      <button class="btn" id="btnOpen">📂 Otvoriť PDF</button>
+      <button class="btn" id="btnSave" disabled>💾 Uložiť PDF</button>
+      <button class="btn ghost" id="btnUndo" title="Späť (Ctrl+Z)" disabled>↶</button>
+      <button class="btn ghost" id="btnRedo" title="Znova (Ctrl+Y)" disabled>↷</button>
+      <span class="search-box">
+        <input id="searchInp" type="text" placeholder="Hľadať v dokumente…">
+        <button class="btn mini" id="searchPrev" title="Predošlé">↑</button>
+        <button class="btn mini" id="searchNext" title="Ďalšie">↓</button>
+        <span id="searchCount" class="muted"></span>
+      </span>
+      <span class="filename" id="fileName">žiadny súbor</span>
+    </div>
+    <div class="top-right">
+      <button class="btn ghost" id="btnPrint" title="Tlačiť" disabled>🖨️</button>
+      <button class="btn ghost" id="btnMood" title="Zmeniť náladu">🎨</button>
+      <button class="btn ghost" id="btnHelp" title="Návod">❔</button>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <nav class="toolbar" id="toolbar">
+      <button class="tool" data-tool="select" title="Výber / posun"><span>🖐️</span>Výber</button>
+      <button class="tool" data-tool="text" title="Pridať text"><span>🅣</span>Text</button>
+      <button class="tool" data-tool="edittext" title="Upraviť existujúci text"><span>✎</span>Upraviť text</button>
+      <button class="tool" data-tool="image" title="Vložiť obrázok"><span>🖼️</span>Obrázok</button>
+      <button class="tool" data-tool="draw" title="Kresliť"><span>✏️</span>Kresliť</button>
+      <button class="tool" data-tool="highlight" title="Zvýrazniť"><span>🖍️</span>Zvýrazniť</button>
+      <button class="tool" data-tool="rect" title="Obdĺžnik"><span>▭</span>Rámik</button>
+      <button class="tool" data-tool="line" title="Čiara"><span>／</span>Čiara</button>
+      <button class="tool" data-tool="note" title="Nalepovací lístok"><span>🗒️</span>Lístok</button>
+      <button class="tool" data-tool="cover" title="Čierne prekrytie (viditeľné)"><span>⬛</span>Prekryť</button>
+      <button class="tool" data-tool="erase" title="Zmazať doplnok"><span>🧽</span>Guma</button>
+      <hr>
+      <button class="tool" id="btnPages" title="Strany"><span>📑</span>Strany</button>
+      <button class="tool" id="btnForm" title="Formulár"><span>🧾</span>Formulár</button>
+      <button class="tool" id="btnOcr" title="OCR – text zo skenu"><span>🔍</span>OCR</button>
+      <button class="tool" id="btnConvert" title="Konverzie"><span>🔄</span>Konverzie</button>
+      <button class="tool" id="btnInfo" title="O dokumente"><span>ℹ️</span>Info</button>
+    </nav>
+
+    <section class="options" id="options"><div class="opt-empty">Vyber si nástroj vľavo.</div></section>
+
+    <main class="viewer" id="viewer">
+      <div class="welcome" id="welcome">
+        <svg viewBox="0 0 120 120" class="welcome-ant"><use href="#antGlyph"/></svg>
+        <h2>Vitaj v dielničke 🐜</h2>
+        <p>Potiahni sem PDF, alebo klikni na <b>Otvoriť PDF</b> hore.</p>
+        <p class="muted">Všetko sa deje len u teba v počítači. Nič sa nikam neposiela.</p>
+      </div>
+      <div id="pages" class="pages"></div>
+    </main>
+  </div>
+
+  <footer class="statusbar">
+    <span id="status">Pripravené.</span>
+    <span class="zoom-controls">
+      <span class="page-jump">Strana <input id="goPage" type="number" min="1" value="1" style="width:52px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;color:var(--ink);padding:2px 4px"> / <span id="pageTotal">–</span></span>
+      <button class="btn mini" id="fitWidth" title="Prispôsobiť na šírku">↔ Na šírku</button>
+      <button class="btn mini" id="zoomOut">–</button>
+      <span id="zoomVal">100 %</span>
+      <button class="btn mini" id="zoomIn">+</button>
+    </span>
+  </footer>
+</div>
+
+<!-- Mravček pri práci -->
+<div id="busy" class="busy hidden">
+  <div class="busy-card">
+    <svg viewBox="0 0 120 120" class="busy-ant"><use href="#antGlyph"/></svg>
+    <p id="busyText">Pracujem…</p>
+    <div class="busy-bar"><div id="busyFill"></div></div>
+  </div>
+</div>
+
+<!-- Univerzálne dialógové okno -->
+<div id="sheet" class="sheet hidden">
+  <div class="sheet-card">
+    <button class="sheet-close" id="sheetClose">✕</button>
+    <div id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<!-- Skrytý mravček ako SVG symbol -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="antGlyph" viewBox="0 0 120 120">
+    <g fill="currentColor">
+      <ellipse cx="60" cy="38" rx="13" ry="12"/>
+      <ellipse cx="60" cy="62" rx="10" ry="11"/>
+      <ellipse cx="60" cy="88" rx="15" ry="16"/>
+      <circle cx="55" cy="35" r="2.4" fill="#fff"/>
+      <circle cx="65" cy="35" r="2.4" fill="#fff"/>
+    </g>
+    <g stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none">
+      <path d="M52 28 Q44 16 36 14"/><path d="M68 28 Q76 16 84 14"/>
+      <path d="M50 60 Q30 54 20 44"/><path d="M50 64 Q28 66 16 74"/>
+      <path d="M70 60 Q90 54 100 44"/><path d="M70 64 Q92 66 104 74"/>
+    </g>
+  </symbol>
+</svg>
+
+<input type="file" id="hiddenFile" accept="application/pdf" hidden>
+<input type="file" id="hiddenImg" accept="image/*" hidden>
+<input type="file" id="hiddenImgs" accept="image/*" multiple hidden>
+<input type="file" id="hiddenMerge" accept="application/pdf" multiple hidden>
+
+<!--VENDOR-->
+<!--APP-->
+</body>
+</html>

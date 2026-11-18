@@ -1,0 +1,39 @@
+Predmet: Darček pre vás dvoch – vaša vlastná PDF dielnička 🐜
+
+Ahojte Pája a Pája,
+
+nekúpil som vám hotový program. Radšej som vám spravil vlastný – taký,
+aký ste vy dvaja. Volá sa Baja & Baja a je to vaša súkromná dielnička
+na PDF. Patrí len vám.
+
+AKO JU SPUSTIŤ (nič sa neinštaluje):
+1. V prílohe je súbor BajaBaja.html – uložte si ho na plochu.
+2. Dvakrát naň kliknite. Otvorí sa v prehliadači (Chrome, Edge, Firefox).
+3. Hotovo. Žiadna inštalácia, žiadny administrátor, žiadne účty.
+
+Všetko sa deje len u vás v počítači – žiadny dokument sa nikam neposiela.
+Funguje aj bez internetu (jedinú výnimku má OCR, ktoré si prvýkrát stiahne
+jazykový balík).
+
+ČO VÁM DIELNIČKA VIE:
+• Otvoriť a prehliadať akékoľvek PDF, vyhľadávať a kopírovať text
+• Dopísať text (aj s diakritikou), vložiť obrázok, podpis či pečiatku
+• Kresliť, zvýrazňovať, rámiky, čiary, nalepovacie lístky
+• Čierne prekrytie na zakrytie údaja
+• Strany: otočiť, zmazať, duplikovať, presúvať, spojiť viac PDF,
+  rozdeliť, pridať prázdnu stranu, vodoznak, očíslovať
+• Vyplniť formuláre
+• OCR – prečítať text zo skenu (SK/CZ/EN)
+• Konverzie: PDF na obrázky, text alebo Word, obrázky na PDF,
+  zmenšenie súboru, vyčistenie údajov o dokumente
+• Tlač hotového dokumentu
+• A malá drobnosť navyše: spýta sa vás, ako sa máte, a podľa nálady
+  sa zafarbí 🐜
+
+Keď dokument upravíte, uložte ho tlačidlom „Uložiť PDF" – vznikne nový
+súbor, pôvodný ostane nedotknutý.
+
+Návod je priamo v appke pod ikonou „?" vpravo hore.
+
+Nech vám slúži a nech vás teší.
+Robko

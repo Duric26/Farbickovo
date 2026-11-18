@@ -1,0 +1,21 @@
+import pw from '/opt/node-tools/node_modules/playwright/index.js';
+const { chromium } = pw;
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path'; import { fileURLToPath } from 'node:url';
+const root = join(dirname(fileURLToPath(import.meta.url)), '..'); const tmp=join(root,'.testtmp'); mkdirSync(join(tmp,'pdf'),{recursive:true});
+const d = await PDFDocument.create(); const f=await d.embedFont(StandardFonts.Helvetica);
+const pg=d.addPage([400,300]); pg.drawText('Form',{x:40,y:260,size:18,font:f});
+const form=d.getForm(); form.createTextField('meno').addToPage(pg,{x:40,y:200,width:180,height:22});
+form.createCheckBox('suhlas').addToPage(pg,{x:40,y:160,width:16,height:16});
+writeFileSync(join(tmp,'pdf','form.pdf'), await d.save());
+const b=await chromium.launch({args:['--no-sandbox']}); const ctx=await b.newContext(); const p=await ctx.newPage();
+p.on('pageerror',e=>console.log('PAGEERR:',e.message));
+await p.goto('file://'+join(root,'dist','BajaBaja.html')); await p.waitForTimeout(900);
+await p.click('button[data-who="obaja"]'); await p.waitForTimeout(150);
+if(await p.locator('#moodModal:not(.hidden)').count()){ await p.click('.mood-btn'); await p.click('#moodSave'); }
+await p.setInputFiles('#hiddenFile', join(tmp,'pdf','form.pdf')); await p.waitForTimeout(1500);
+await p.click('#btnForm'); await p.waitForTimeout(800);
+const html = await p.evaluate(()=>document.getElementById('sheetBody').innerHTML);
+console.log('SHEET HTML:\n', html.slice(0,600));
+await b.close();
