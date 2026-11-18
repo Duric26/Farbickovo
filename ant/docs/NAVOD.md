@@ -18,7 +18,7 @@ Vaša vlastná dielnička na PDF. Nie kúpený program — vlastná appka, sprav
 
 ## Prvé spustenie
 
-- Vyberiete si, **kto otvára dielničku** (Pája 1 / Pája 2 / obaja).
+- Vyberiete si, **kto otvára dielničku** (Pája / Pája / obaja).
 - Dielnička sa spýta, **ako sa dnes máte**, a podľa nálady sa zafarbí.
 - Potom už ste v dielničke. Náladu viete kedykoľvek zmeniť ikonou 🎨 vpravo hore.
 

@@ -1047,7 +1047,7 @@ const MOODS = [
   { k: 'unava', emo: '🥱', t: 'Únava', theme: 'unava' },
   { k: 'hnev', emo: '😤', t: 'Nabrúsenosť', theme: 'hnev' },
 ];
-const DED = `Pre Páju 1 a Páju 2 🐜
+const DED = `Pre Páju a Páju 🐜
 od Robka Ďuriča.
 
 Nekúpil som vám hotový program.
